@@ -9,20 +9,27 @@ func NewBoundlessJobRunner() JobRunner {
 }
 
 type boundlessJobRunner struct {
-
 }
 
 func (bjr boundlessJobRunner) Run(job Job) {
-	go func() {
+	id := job.id
+	go func(JobId) {
 		var err error
 		var metadata map[string]interface{}
+		metadata = job.initialMetadata
 		defer func() {
 			errMsg := "ok"
 			if err != nil {
 				errMsg = err.Error()
 			}
-			job.stateFunc(finished(errMsg,metadata))
+			job.stateFunc(finished(id, errMsg, metadata))
 		}()
-		metadata, err = job.jobFunc()
-	}()
+		job.stateFunc(started(id, "ok", metadata))
+		returnedMetadata, err := job.jobFunc()
+		if returnedMetadata != nil {
+			for k, v := range returnedMetadata {
+				metadata[k] = v
+			}
+		}
+	}(id)
 }

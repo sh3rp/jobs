@@ -1,15 +1,17 @@
 package jobs
 
+import "fmt"
+
 type JobManager interface {
 	Submit(Job) error
 }
 
 type simpleJobManager struct {
-	runner   JobRunner
+	runner JobRunner
 }
 
 func NewSimpleJobManager(jobRunner JobRunner) JobManager {
-	simple := simpleJobManager {
+	simple := simpleJobManager{
 		runner: jobRunner,
 	}
 
@@ -17,10 +19,16 @@ func NewSimpleJobManager(jobRunner JobRunner) JobManager {
 }
 
 func (sqjm simpleJobManager) Submit(job Job) error {
-	if job.stateFunc != nil {
-		job.stateFunc(submitted("ok",nil))
+	if job.id == "" {
+		job.id = JobId(NewID())
 	}
+	if job.jobFunc == nil {
+		return fmt.Errorf("Job function must be defined")
+	}
+	if job.stateFunc == nil {
+		return fmt.Errorf("State function must be defined")
+	}
+	job.stateFunc(submitted(job.id, "ok", job.initialMetadata))
 	sqjm.runner.Run(job)
 	return nil
 }
-
