@@ -1,10 +1,12 @@
 package jobs
 
+import "reflect"
+
 type job struct {
 	id              JobId
-	jobFunc         func() (map[string]interface{}, error)
+	jobFunc         func() ([]KV, error)
 	stateFunc       func(JobState)
-	initialMetadata map[string]interface{}
+	initialMetadata []KV
 }
 
 type JobId string
@@ -13,14 +15,14 @@ type JobState struct {
 	id       JobId
 	state    int
 	message  string
-	metadata map[string]interface{}
+	metadata []KV
 }
 
 func (js JobState) Message() string {
 	return js.message
 }
 
-func (js JobState) Metadata() map[string]interface{} {
+func (js JobState) Metadata() []KV {
 	return js.metadata
 }
 
@@ -34,18 +36,18 @@ const (
 	FINISHED
 )
 
-func submitted(id JobId, msg string, metadata map[string]interface{}) JobState {
+func submitted(id JobId, msg string, metadata []KV) JobState {
 	return newJobState(id, SUBMITTED, msg, metadata)
 }
-func started(id JobId, msg string, metadata map[string]interface{}) JobState {
+func started(id JobId, msg string, metadata []KV) JobState {
 	return newJobState(id, STARTED, msg, metadata)
 }
 
-func finished(id JobId, msg string, metadata map[string]interface{}) JobState {
+func finished(id JobId, msg string, metadata []KV) JobState {
 	return newJobState(id, FINISHED, msg, metadata)
 }
 
-func newJobState(id JobId, state int, msg string, metadata map[string]interface{}) JobState {
+func newJobState(id JobId, state int, msg string, metadata []KV) JobState {
 	return JobState{
 		id:       id,
 		state:    state,
@@ -62,14 +64,11 @@ func WithStateHandler(h func(JobState)) func(*job) {
 
 func WithKV(key string, value interface{}) func(*job) {
 	return func(job *job) {
-		if job.initialMetadata == nil {
-			job.initialMetadata = make(map[string]interface{})
-		}
-		job.initialMetadata[key] = value
+		job.initialMetadata = append(job.initialMetadata, KV{K: K(key), V: V{Type: reflect.TypeOf(value).Name(), Value: value}})
 	}
 }
 
-func newJob(f func() (map[string]interface{}, error), options ...func(*job)) job {
+func NewJob(f func() ([]KV, error), options ...func(*job)) job {
 	job := &job{
 		id:      JobId(NewID()),
 		jobFunc: f,

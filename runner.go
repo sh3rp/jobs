@@ -1,7 +1,7 @@
 package jobs
 
 type JobRunner interface {
-	Run(Job)
+	Run(job)
 }
 
 func NewBoundlessJobRunner() JobRunner {
@@ -11,11 +11,11 @@ func NewBoundlessJobRunner() JobRunner {
 type boundlessJobRunner struct {
 }
 
-func (bjr boundlessJobRunner) Run(job Job) {
+func (bjr boundlessJobRunner) Run(job job) {
 	id := job.id
 	go func(JobId) {
 		var err error
-		var metadata map[string]interface{}
+		var metadata []KV
 		metadata = job.initialMetadata
 		defer func() {
 			errMsg := "ok"
@@ -26,9 +26,9 @@ func (bjr boundlessJobRunner) Run(job Job) {
 		}()
 		job.stateFunc(started(id, "ok", metadata))
 		returnedMetadata, err := job.jobFunc()
-		if returnedMetadata != nil {
-			for k, v := range returnedMetadata {
-				metadata[k] = v
+		if returnedMetadata != nil && len(returnedMetadata) > 0 {
+			for _, row := range returnedMetadata {
+				metadata = append(metadata, row)
 			}
 		}
 	}(id)

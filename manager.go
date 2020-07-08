@@ -3,7 +3,7 @@ package jobs
 import "fmt"
 
 type JobManager interface {
-	Submit(Job) error
+	Submit(job) error
 }
 
 type simpleJobManager struct {
@@ -18,7 +18,7 @@ func NewSimpleJobManager(jobRunner JobRunner) JobManager {
 	return simple
 }
 
-func (sqjm simpleJobManager) Submit(job Job) error {
+func (sqjm simpleJobManager) Submit(job job) error {
 	if job.id == "" {
 		job.id = JobId(NewID())
 	}
