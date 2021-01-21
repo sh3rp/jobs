@@ -1,20 +1,18 @@
 package jobs
 
 import (
-	"fmt"
 	"math/rand"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestJobManagerOneJob(t *testing.T) {
 	manager := NewSimpleJobManager(NewBoundlessJobRunner())
 	wg := sync.WaitGroup{}
-	job := func() ([]KV, error) {
-		t.Logf("executing some bullshit")
-		time.Sleep(time.Duration(rand.Intn(3)) * time.Second)
-		t.Logf("doing some more bullshit")
+	jobFunc := func() ([]KV, error) {
 		time.Sleep(time.Duration(rand.Intn(3)) * time.Second)
 		return []KV{
 			KV{K: K("donkey"), V: V{Type: "string", Value: "shoes"}},
@@ -23,41 +21,43 @@ func TestJobManagerOneJob(t *testing.T) {
 		}, nil
 	}
 	wg.Add(1)
-	manager.Submit(NewJob(job,
-		WithStateHandler(func(state JobState) {
-			t.Logf("[STATE] (%s) [%s] msg=%s, metadata=%+v", state.id, state.String(), state.Message(), state.Metadata())
-			if state.state == FINISHED {
-				wg.Done()
-			}
-		}),
-		WithKV("test", "iteration")))
+	manager.AddJobStateListener(func(state JobState) {
+		t.Logf("[STATE] (%s) [%s] msg=%s, metadata=%+v", state.id, state.String(), state.Message(), state.Metadata())
+		if state.state == FINISHED {
+			wg.Done()
+		}
+	})
+	manager.Submit(jobFunc)
 	wg.Wait()
 }
 
 func TestJobManagerFiftyJobs(t *testing.T) {
 	manager := NewSimpleJobManager(NewBoundlessJobRunner())
 	wg := sync.WaitGroup{}
-	job := func() ([]KV, error) {
-		t.Logf("executing some bullshit")
-		time.Sleep(time.Duration(rand.Intn(3)) * time.Second)
-		t.Logf("doing some more bullshit")
+	jobFunc := func() ([]KV, error) {
 		time.Sleep(time.Duration(rand.Intn(3)) * time.Second)
 		return []KV{
 			KV{K: K("donkey"), V: V{Type: "string", Value: "shoes"}},
 			KV{K: K("device"), V: V{Type: "string", Value: "sw1-iad01"}},
 		}, nil
 	}
+	jobsDone := make(map[JobId]bool)
+	manager.AddJobStateListener(func(state JobState) {
+		t.Logf("[STATE] (%s) [%s] msg=%s, metadata=%+v", state.id, state.String(), state.Message(), state.Metadata())
+		if state.state == FINISHED {
+			jobsDone[state.id] = true
+			wg.Done()
+		}
+	})
 	for i := 0; i < 50; i++ {
 		wg.Add(1)
-		manager.Submit(
-			NewJob(job,
-				WithStateHandler(func(state JobState) {
-					t.Logf("[STATE] (%s) [%s] msg=%s, metadata=%+v", state.id, state.String(), state.Message(), state.Metadata())
-					if state.state == FINISHED {
-						wg.Done()
-					}
-				}),
-				WithKV(fmt.Sprintf("test-%d", i), fmt.Sprintf("iteration-%d", i))))
+		jobId, err := manager.Submit(jobFunc)
+		assert.NoError(t, err)
+		assert.NotNil(t, jobId)
 	}
 	wg.Wait()
+
+	for _, val := range jobsDone {
+		assert.True(t, val)
+	}
 }

@@ -1,34 +1,38 @@
 package jobs
 
-import "fmt"
-
 type JobManager interface {
-	Submit(job) error
+	AddJobStateListener(func(JobState))
+	Submit(func() ([]KV, error)) (JobId, error)
 }
 
 type simpleJobManager struct {
-	runner JobRunner
+	runner            JobRunner
+	jobStateListeners []func(JobState)
 }
 
 func NewSimpleJobManager(jobRunner JobRunner) JobManager {
-	simple := simpleJobManager{
+	simple := &simpleJobManager{
 		runner: jobRunner,
 	}
 
 	return simple
 }
 
-func (sqjm simpleJobManager) Submit(job job) error {
-	if job.id == "" {
-		job.id = JobId(NewID())
-	}
-	if job.jobFunc == nil {
-		return fmt.Errorf("Job function must be defined")
-	}
-	if job.stateFunc == nil {
-		return fmt.Errorf("State function must be defined")
-	}
+func (sqjm *simpleJobManager) AddJobStateListener(f func(JobState)) {
+	sqjm.jobStateListeners = append(sqjm.jobStateListeners, f)
+}
+
+func (sqjm *simpleJobManager) Submit(jobFunc func() ([]KV, error)) (JobId, error) {
+	job := NewJob(jobFunc, WithStateHandler(sqjm.handleState))
 	job.stateFunc(submitted(job.id, "ok", job.initialMetadata))
 	sqjm.runner.Run(job)
-	return nil
+	return job.id, nil
+}
+
+func (sqjm *simpleJobManager) handleState(jobState JobState) {
+	if sqjm.jobStateListeners != nil {
+		for _, f := range sqjm.jobStateListeners {
+			f(jobState)
+		}
+	}
 }
