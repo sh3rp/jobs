@@ -1,28 +1,28 @@
 package jobs
 
 func NewPooledJobRunner(poolSize int) JobRunner {
-	return pooledJobRunner{poolSize,make(chan job),make(chan result)}
+	return pooledJobRunner{poolSize, make(chan job), make(chan result)}
 }
 
 type pooledJobRunner struct {
-	poolSize int
-	jobsChannel chan job
+	poolSize      int
+	jobsChannel   chan job
 	resultChannel chan result
 }
 
-type result stuct {
-	id JobId
+type result struct {
+	job job
 	kvs []KV
 	err error
 }
 
 func (pjr pooledJobRunner) start() {
-	for i := 1 ; i <= pjr.poolSize ; i++ {
-		go worker(i,pjr.jobsChannel,pjr.resultChannel)
+	for i := 1; i <= pjr.poolSize; i++ {
+		go worker(i, pjr.jobsChannel, pjr.resultChannel)
 	}
 }
 
-func worker(workerId int, jobs <- chan job, results <- chan result) {
+func worker(workerId int, jobs <-chan job, results <-chan result) {
 	for j := range jobs {
 		var err error
 		var metadata []KV
@@ -41,10 +41,16 @@ func worker(workerId int, jobs <- chan job, results <- chan result) {
 				metadata = append(metadata, row)
 			}
 		}
-		results <- result{job.id,metadata,err}
+		results <- result{job, metadata, err}
 	}
 }
 
 func (pjr pooledJobRunner) Run(job job) {
 	pjr.jobChannel <- job
+}
+
+func (pjr pooledJobRunner) publisher() {
+	for result := range pjr.resultChannel {
+		result.job.stateFunc(finished(job.id, result, metadata))
+	}
 }
