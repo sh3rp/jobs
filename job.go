@@ -18,6 +18,14 @@ type JobState struct {
 	metadata []KV
 }
 
+func (js JobState) Id() string {
+	return string(js.id)
+}
+
+func (js JobState) State() int {
+	return js.state
+}
+
 func (js JobState) Message() string {
 	return js.message
 }
