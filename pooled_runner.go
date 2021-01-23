@@ -51,6 +51,6 @@ func (pjr pooledJobRunner) Run(j job) {
 
 func (pjr pooledJobRunner) publisher() {
 	for result := range pjr.resultChannel {
-		result.job.stateFunc(finished(job.id, result, metadata))
+		result.job.stateFunc(finished(result.job.id, result.err.Error(), result.kvs))
 	}
 }
