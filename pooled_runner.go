@@ -22,31 +22,31 @@ func (pjr pooledJobRunner) start() {
 	}
 }
 
-func worker(workerId int, jobs <-chan job, results <-chan result) {
+func worker(workerId int, jobs chan job, results chan result) {
 	for j := range jobs {
 		var err error
 		var metadata []KV
-		metadata = job.initialMetadata
+		metadata = j.initialMetadata
 		defer func() {
 			errMsg := "ok"
 			if err != nil {
 				errMsg = err.Error()
 			}
-			job.stateFunc(finished(id, errMsg, metadata))
+			j.stateFunc(finished(j.id, errMsg, metadata))
 		}()
-		job.stateFunc(started(id, "ok", metadata))
-		returnedMetadata, err := job.jobFunc()
+		j.stateFunc(started(j.id, "ok", metadata))
+		returnedMetadata, err := j.jobFunc()
 		if returnedMetadata != nil && len(returnedMetadata) > 0 {
 			for _, row := range returnedMetadata {
 				metadata = append(metadata, row)
 			}
 		}
-		results <- result{job, metadata, err}
+		results <- result{j, metadata, err}
 	}
 }
 
-func (pjr pooledJobRunner) Run(job job) {
-	pjr.jobChannel <- job
+func (pjr pooledJobRunner) Run(j job) {
+	pjr.jobsChannel <- j
 }
 
 func (pjr pooledJobRunner) publisher() {
